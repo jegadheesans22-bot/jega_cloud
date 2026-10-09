@@ -3,10 +3,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'mysql.railway.internal',
   port: parseInt(process.env.DB_PORT || '3306', 10),
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+  password: process.env.DB_PASSWORD || 'YLsmdYruinvhVxqoefcFfrBRZSnDuIPl',
 };
 
 const DB_NAME = process.env.DB_NAME || 'jegamart_db';
