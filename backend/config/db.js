@@ -1,46 +1,69 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
+// Railway MySQL Configuration
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'ranjith1704',
+  host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
+  port: Number(
+    process.env.MYSQLPORT || process.env.DB_PORT || 3306
+  ),
+  user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
+  password:
+    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  decimalNumbers: true,
 };
 
-
-const DB_NAME = process.env.DB_NAME || 'jegamart_db';
+const DB_NAME =
+  process.env.MYSQLDATABASE ||
+  process.env.DB_NAME ||
+  'jegamart_db';
 
 let pool = null;
 
 export async function initDatabase() {
   try {
-    // Connect to MySQL server to ensure the database exists
-    const rootConnection = await mysql.createConnection(dbConfig);
-    await rootConnection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-    );
-    await rootConnection.end();
-
-    // Create pool for jegamart_db
+    // Connect directly to the Railway MySQL database
     pool = mysql.createPool({
       ...dbConfig,
       database: DB_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      decimalNumbers: true,
     });
 
-    console.log(`[Database] Connected to MySQL database "${DB_NAME}"`);
+    // Verify the connection
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.ping();
+      console.log(
+        `[Database] Connected successfully to "${DB_NAME}"`
+      );
+    } finally {
+      connection.release();
+    }
 
     // Create tables
     await createTables();
 
+    console.log(
+      '[Database] All tables checked/created successfully.'
+    );
+
     return pool;
   } catch (error) {
-    console.error('[Database] Failed to initialize database:', error.message);
+    console.error(
+      '[Database] Failed to initialize database:',
+      error.message
+    );
+
+    if (pool) {
+      await pool.end().catch(() => {});
+      pool = null;
+    }
+
     throw error;
   }
 }
@@ -69,7 +92,8 @@ async function createTables() {
       stock INT NOT NULL DEFAULT 0,
       image VARCHAR(1000),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB;
   `;
 
@@ -82,8 +106,10 @@ async function createTables() {
       saved_for_later TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_cart_user (user_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id)
+        REFERENCES products(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `;
 
@@ -92,7 +118,14 @@ async function createTables() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       total_amount DECIMAL(10, 2) NOT NULL,
-      status ENUM('PLACED', 'CONFIRMED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED') NOT NULL DEFAULT 'PLACED',
+      status ENUM(
+        'PLACED',
+        'CONFIRMED',
+        'PACKED',
+        'SHIPPED',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED'
+      ) NOT NULL DEFAULT 'PLACED',
       customer_name VARCHAR(255) NOT NULL,
       phone VARCHAR(50) NOT NULL,
       address TEXT NOT NULL,
@@ -100,7 +133,8 @@ async function createTables() {
       pincode VARCHAR(20) NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_orders_user (user_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `;
 
@@ -114,8 +148,10 @@ async function createTables() {
       price DECIMAL(10, 2) NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_items_order (order_id),
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      FOREIGN KEY (order_id)
+        REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id)
+        REFERENCES products(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `;
 
@@ -129,7 +165,8 @@ async function createTables() {
       transaction_id VARCHAR(100) NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_payments_order (order_id),
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      FOREIGN KEY (order_id)
+        REFERENCES orders(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `;
 
@@ -137,28 +174,43 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS order_status_history (
       id INT AUTO_INCREMENT PRIMARY KEY,
       order_id INT NOT NULL,
-      status ENUM('PLACED', 'CONFIRMED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED') NOT NULL,
+      status ENUM(
+        'PLACED',
+        'CONFIRMED',
+        'PACKED',
+        'SHIPPED',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED'
+      ) NOT NULL,
       notes VARCHAR(255),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_history_order (order_id),
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      FOREIGN KEY (order_id)
+        REFERENCES orders(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `;
 
-  await pool.query(usersTable);
-  await pool.query(productsTable);
-  await pool.query(cartTable);
-  await pool.query(ordersTable);
-  await pool.query(orderItemsTable);
-  await pool.query(paymentsTable);
-  await pool.query(orderTrackingHistoryTable);
+  const tables = [
+    usersTable,
+    productsTable,
+    cartTable,
+    ordersTable,
+    orderItemsTable,
+    paymentsTable,
+    orderTrackingHistoryTable,
+  ];
 
-  console.log('[Database] All tables checked/created successfully.');
+  for (const table of tables) {
+    await pool.query(table);
+  }
 }
 
 export function getPool() {
   if (!pool) {
-    throw new Error('Database pool not initialized. Call initDatabase() first.');
+    throw new Error(
+      'Database pool not initialized. Call initDatabase() first.'
+    );
   }
+
   return pool;
 }
