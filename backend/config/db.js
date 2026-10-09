@@ -11,7 +11,7 @@ const dbConfig = {
   ),
   user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
   password:
-    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
+    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || 'ranjith1704',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
