@@ -1,9 +1,17 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
-// Railway MySQL Configuration
+// Database Configuration (supports Railway MySQL, Cloud MySQL, and local MySQL)
+const connectionUri = process.env.MYSQL_URL || process.env.DATABASE_URL;
+
 const dbConfig = {
   host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
   port: Number(
@@ -11,27 +19,29 @@ const dbConfig = {
   ),
   user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
   password:
-    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || 'ranjith1704',
+    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
+  database:
+    process.env.MYSQLDATABASE ||
+    process.env.DB_NAME ||
+    'jegamart_db',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   decimalNumbers: true,
 };
 
-const DB_NAME =
-  process.env.MYSQLDATABASE ||
-  process.env.DB_NAME ||
-  'jegamart_db';
+const DB_NAME = dbConfig.database;
 
 let pool = null;
 
 export async function initDatabase() {
   try {
-    // Connect directly to the Railway MySQL database
-    pool = mysql.createPool({
-      ...dbConfig,
-      database: DB_NAME,
-    });
+    // Connect directly to MySQL (via URI or connection options)
+    if (connectionUri) {
+      pool = mysql.createPool(connectionUri);
+    } else {
+      pool = mysql.createPool(dbConfig);
+    }
 
     // Verify the connection
     const connection = await pool.getConnection();
